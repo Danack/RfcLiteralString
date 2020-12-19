@@ -71,7 +71,7 @@ var_dump(is_literal(rand(0, 10));
 
 $bar = 'bar';
 var_dump(is_literal("foo" . $bar));
-// false - strings cannot be compiled in place at compile time.
+// false - strings are not compiled in place at run time.
 
 function foo($bar) {
     return is_literal($bar);
