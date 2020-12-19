@@ -28,3 +28,10 @@ foo('bar_' . $entries[rand(0, 100)]);
 ```
 
 That code would work 99 times out of a hundred. 
+
+
+Design Goals
+Local Reasoning: Preconditions established by surrounding code
+Scalable & Mandatory Expert Review
+● Avoid need for expert reasoning about preconditions all throughout application code
+● Confine security-relevant program slice to expert-owned/reviewed source
