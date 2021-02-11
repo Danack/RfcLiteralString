@@ -150,6 +150,17 @@ Trying to determine if the is_literal flag should be passed through functions li
 
 For any use-case where dynamic strings are required, it would be better to build those strings with an appropriate query builder,
 
+## F.A.Q
+
+### Why are floats and bools not considered literal
+
+Because when converting either of them to string, they aren't guaranteed (and often don't) have the exact same value that they have in source code. 
+
+For example, the floating point number `0.1` is stored as `0.1000000000000000055511151231257827021181583404541015625` as that is the closest representable 64bit floating point number. Casting that to string either truncates the value, or doesn't match the stored value.
+
+For bools, `TRUE` and `true` when cast to string give "1". For `FALSE` and `false` both give "" aka empty string.
+
+
 ## Questions
 
 ???
