@@ -1,4 +1,6 @@
 
+The position of this RFC is that dynamic concatenated literal strings are an edge-case. Although it would be possible to preserve the literal-ness of runtime concatenated strings, it would be a small performance overhead. It would also make it more difficult to reason about this feature.
+
 
 It would also be annoying for userland code:
 

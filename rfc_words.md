@@ -1,4 +1,4 @@
-# PHP RFC: safe literals
+# PHP RFC: literal string
 
 ## Introduction
 
@@ -40,15 +40,20 @@ Adding a way for function to check if the strings they were given were embedded 
 
 ## Proposal 
 
-This RFC proposes adding an is_literal() function to check if a variable represents a value written into the source code or not.
+This RFC proposes adding three functions:
+
+* is_literal(string $string): boold to check if a variable represents a value written into the source code or not.
+* literal_combine(string $piece, string $pieces): string to allow concatenating strings. 
+* literal_implode(string $glue, array $pieces): string to allow building  
 
 ### Add is_literal function
 
 Add an //is_literal()// function to check if a variable represents a value written into the source code. The function returns true if the variable is a literal from the source, and false if is not.
 
-Strings that can be concatenated in place at compile time are treated as single literals.  
+~~Strings that can be concatenated in place at compile time are treated as single literals.~~  
 
-```<?php
+```php
+<?php
 
 var_dump(is_literal("foo"));
 // true - this is directly a string literal 
@@ -59,8 +64,9 @@ var_dump($value);
 
 var_dump(4); // true
 var_dump(0.3); // true
+
 var_dump(is_literal("foo" . "bar"));
-// true - compiler can concatenate two strings into one. 
+// false - use literal_combine if you need to combine literals.  
 
 
 var_dump(is_literal($_GET['search']));
@@ -109,6 +115,8 @@ function getDataFromWeb(string|SearchBuilder $limit) {
     return file_get_contents($url);
 }
 
+TODO - this example is bogus getSearchLimit() isn't used.
+
 class SearchBuilder {
 
     private int $limit;
@@ -137,22 +145,64 @@ getDataFromWeb($_GET['limit']);
 
 If the api was called with search set to 'latest_news=foo&userid=123' this is an injection attack that would be blocked by this pattern of coding.
 
+### Example of using literal_combine
+
+```
+class Order
+{
+    const ASC = 'ASC';
+    const DESC = 'DESC';
+}
+
+function getOrderString(int $x): string
+{
+    if ($x > 0) {
+        return literal_combine('order', '=', Sorting::ASC);
+    }   
+    else if ($x < 0) {
+        return literal_combine('order', '=', Sorting::DESC);
+    }   
+
+    return "";
+}
+
+$orderQueryString = getOrderString(rand(-10, 10));
+var_dump(is_literal($orderQueryString));
+// output is bool(true).
+```
+
+### Example of using literal_implode
+
+function getQueryPlaceholders(int $count): string
+{
+    $array = array_fill(0, int $count, '?');
+    return literal_implode(', ', $array);
+}
+
+$placeholder = getQueryPlaceholders(5);
+
+echo $placeholder;
+// output is '?, ?, ?, ?, ?'
+var_dump(is_literal($placeholder));
+// output is bool(true).
 
 ## Notes
 
 The aim of this RFC is not to make it impossible to write code that contains data injection attacks, instead the aim is to make it easy to avoid doing that accidentally.
 
-### No concatenating dynamic strings
+### literal flag is not preserved through existing string functions
 
-The position of this RFC is that dynamic concatenated literal strings are an edge-case. Although it would be possible to preserve the literal-ness of runtime concatenated strings, it would be a small performance overhead. It would also make it more difficult to reason about this feature. 
+Trying to determine if the is_literal flag should be passed through functions like str_repeat, or substr etc is difficult. Having a security feature be difficult to reason about, gives a much higher chance of making a mistake.
 
-Trying to determine if the is_literal flag should be passed through functions like implode, str_repeat, substr etc is difficult. Having a security feature be difficult to reason about, gives a much higher chance of making a mistake.
-
-For any use-case where dynamic strings are required, it would be better to build those strings with an appropriate query builder,
+For any use-case where dynamic strings are required, it would be better to build those strings with an appropriate query builder or either of literal_combine or literal_implode.
 
 ## F.A.Q
 
-### Why are floats and bools not considered literal
+### Why are int literalness not tracked?
+
+Can't be bothered aka seems very low value feature.
+
+### Why are floats and bools not considered literal?
 
 Because when converting either of them to string, they aren't guaranteed (and often don't) have the exact same value that they have in source code. 
 
@@ -167,7 +217,7 @@ For bools, `TRUE` and `true` when cast to string give "1". For `FALSE` and `fals
 
 ## Backward Incompatible Changes 
 
-Adding is_literal() has no known BC breaks, except for code-bases that already contain a userland function with that name
+No known BC breaks, except for code-bases that already contain userland functions is_literal(), literal_implode() or literal_combine().
 
 ## Proposed PHP Version(s) 
 
@@ -177,7 +227,7 @@ PHP 8.1
 
 ### To SAPIs 
 
-Not sure
+None know.
 
 ### To Existing Extensions 
 
@@ -187,8 +237,7 @@ Not sure
 
 Not sure
 
-## Open Issues 
-
+## Open Issues
 
 ## Unaffected PHP Functionality 
 
