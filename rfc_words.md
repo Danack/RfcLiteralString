@@ -223,15 +223,11 @@ And then we have some code that does stuff:
 ```
 $sortOrder = 'ASC';
 
-// 50 lines of code, or multiple function calls
-// 50 lines of code, or multiple function calls
-// 50 lines of code, or multiple function calls
+// 20 lines of code, or multiple function calls
 
 $params[] = 'order=' . $sortOrder;
  
-// 50 lines of code, or multiple function calls
-// 50 lines of code, or multiple function calls
-// 50 lines of code, or multiple function calls
+// 500 lines of code, or multiple function calls
 
 foo($params[]);
 ```
