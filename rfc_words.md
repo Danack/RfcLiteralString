@@ -173,6 +173,7 @@ var_dump(is_literal($orderQueryString));
 
 ### Example of using literal_implode
 
+```php
 function getQueryPlaceholders(int $count): string
 {
     $array = array_fill(0, int $count, '?');
@@ -185,6 +186,7 @@ echo $placeholder;
 // output is '?, ?, ?, ?, ?'
 var_dump(is_literal($placeholder));
 // output is bool(true).
+```
 
 ## Notes
 
