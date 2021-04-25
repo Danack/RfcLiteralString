@@ -198,7 +198,72 @@ For any use-case where dynamic strings are required, it would be better to build
 
 ## F.A.Q
 
-### Why are int literalness not tracked?
+
+### Why no support for string concatenation operator
+
+Imagine we have a function that checks for safety:
+
+```
+function foo(array $params)
+{
+    foreach ($params as $param) {
+        // TODO - rename SearchBuilder
+        if (is_literal($param) !== true && !($param instanceof SearchBuilder)) {
+            throw new \Exception("this is not safe."); 
+        }
+    }
+    ...
+}
+
+```
+
+And then we have some code that does stuff:
+```
+$sortOrder = 'ASC';
+
+// 50 lines of code, or multiple function calls
+// 50 lines of code, or multiple function calls
+// 50 lines of code, or multiple function calls
+
+$params[] = 'order=' . $sortOrder;
+ 
+// 50 lines of code, or multiple function calls
+// 50 lines of code, or multiple function calls
+// 50 lines of code, or multiple function calls
+
+foo($params[]);
+```
+
+This code works, but then a few months later someone in the team changes it to be:
+
+```
+$sortOrder = $_GET['order'];
+
+// 20 lines of code, or multiple function calls
+
+$params[] = 'order=' . $sortOrder;
+ 
+// 500 lines of code, or multiple function calls
+
+foo($params[]);
+
+```
+
+That code would correctly fail, but it would be a nightmare trying to track back where the error lies in the program.
+
+Although forcing developers to use specific functions to explicitly preserve the literal flag has a small overhead, it makes it easier to maintain large applications.
+
+```
+$sortOrder = $_GET['order'];
+
+// 20 lines of code, or multiple function calls
+
+$params[] = literal_combine('order=', $sortOrder);
+// ERROR occurs here, closer to where $sortOrder is coming from.
+```
+
+
+### Why is int literalness not tracked?
 
 Can't be bothered aka seems very low value feature.
 
