@@ -42,7 +42,7 @@ Adding a way for function to check if the strings they were given were embedded 
 
 This RFC proposes adding three functions:
 
-* is_literal(string $string): boolean to check if a variable represents a value written into the source code or not.
+* is_literal(string $string): bool to check if a variable represents a value written into the source code or not.
 * literal_combine(string $piece, string $pieces): string to allow concatenating strings. 
 * literal_implode(string $glue, array $pieces): string to allow building  
 
