@@ -1,0 +1,12 @@
+
+
+
+Initial thinking                           4
+Initial attempt at implementation          8
+RFC words                                  6
+Crappy rework attempt at implementation    8
+Rebasing to Joes branch                    2
+Thinking about string concat               2
+Thinking about naming                      1
+Added specific Error                      1.5
+Wrote words about naming                 0.5

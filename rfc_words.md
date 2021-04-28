@@ -188,6 +188,10 @@ var_dump(is_literal($placeholder));
 // output is bool(true).
 ```
 
+
+Both literal_combine() and literal_implode() will throw a LiteralStringRequiredError exception if any of the parameters passed to them are not literal strings. LiteralStringRequiredError is extended from TypeError. Error is the correct hierarchy (rather than exception) as passing a non-literal string where a literal string is required is a programming error, rather than a 'conditional' error (e.g. like network unplugged), and can only be fixed by someone fixing the code. 
+
+
 ## Notes
 
 The aim of this RFC is not to make it impossible to write code that contains data injection attacks, instead the aim is to make it easy to avoid doing that accidentally.
@@ -259,6 +263,12 @@ $sortOrder = $_GET['order'];
 $params[] = literal_combine('order=', $sortOrder);
 // ERROR occurs here, closer to where $sortOrder is coming from.
 ```
+
+### Why the name 'is_literal' ?
+
+Literal string is the standard name for strings in source code. See https://www.google.com/search?q=what+is+literal+string+in+php 
+
+> A string literal is the notation for representing a string value within the text of a computer program. In PHP, strings can be created with single quotes, double quotes or using the heredoc or the nowdoc syntax. ... The heredoc preserves the line breaks and other whitespace (including indentation) in the text.
 
 
 ### Why is int literalness not tracked?
