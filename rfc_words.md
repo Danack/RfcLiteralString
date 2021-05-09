@@ -43,15 +43,14 @@ Adding a way for function to check if the strings they were given were embedded 
 This RFC proposes adding three functions:
 
 * is_literal(string $string): bool to check if a variable represents a value written into the source code or not.
-* literal_combine(string $piece, string $pieces): string to allow concatenating strings. 
+* literal_concat(string $piece, string $pieces): string to allow concatenating strings. 
 * literal_implode(string $glue, array $pieces): string to allow building  
 
 ### Add is_literal function
 
 Add an `is_literal()` function to check if a variable represents a value written into the source code. The function returns true if the variable is a literal from the source, and false if is not.
 
-~~Strings that can be concatenated in place at compile time are treated as single literals.~~  
-
+  
 ```php
 <?php
 
@@ -66,7 +65,7 @@ var_dump(4); // true
 var_dump(0.3); // true
 
 var_dump(is_literal("foo" . "bar"));
-// false - use literal_combine if you need to combine literals.  
+// false - use literal_concat if you need to combine literals.  
 
 
 var_dump(is_literal($_GET['search']));
@@ -145,7 +144,7 @@ getDataFromWeb($_GET['limit']);
 
 If the api was called with search set to 'latest_news=foo&userid=123' this is an injection attack that would be blocked by this pattern of coding.
 
-### Example of using literal_combine
+### Example of using literal_concat
 
 ```
 class Order
@@ -157,10 +156,10 @@ class Order
 function getOrderString(int $x): string
 {
     if ($x > 0) {
-        return literal_combine('order', '=', Sorting::ASC);
+        return literal_concat('order', '=', Sorting::ASC);
     }   
     else if ($x < 0) {
-        return literal_combine('order', '=', Sorting::DESC);
+        return literal_concat('order', '=', Sorting::DESC);
     }   
 
     return "";
@@ -189,7 +188,7 @@ var_dump(is_literal($placeholder));
 ```
 
 
-Both literal_combine() and literal_implode() will throw a LiteralStringRequiredError exception if any of the parameters passed to them are not literal strings. LiteralStringRequiredError is extended from TypeError. Error is the correct hierarchy (rather than exception) as passing a non-literal string where a literal string is required is a programming error, rather than a 'conditional' error (e.g. like network unplugged), and can only be fixed by someone fixing the code. 
+Both literal_concat() and literal_implode() will throw a LiteralStringRequiredError exception if any of the parameters passed to them are not literal strings. LiteralStringRequiredError is extended from TypeError. Error is the correct hierarchy (rather than exception) as passing a non-literal string where a literal string is required is a programming error, rather than a 'conditional' error (e.g. like network unplugged), and can only be fixed by someone fixing the code. 
 
 
 ## Notes
@@ -198,71 +197,98 @@ The aim of this RFC is not to make it impossible to write code that contains dat
 
 ### literal flag is not preserved through existing string functions
 
-Trying to determine if the is_literal flag should be passed through functions like str_repeat, or substr etc is difficult. Having a security feature be difficult to reason about, gives a much higher chance of making a mistake.
+Trying to determine if the is_literal flag should be passed through functions like str_repeat, or substr etc is difficult. Having a security feature be difficult to reason about, gives a much higher chance of making a mistake. In my opinion, one of the reasons why taint checking is sub-optimal as a technique is that it doesn't make code be trivial to reason about.
 
-For any use-case where dynamic strings are required, it would be better to build those strings with an appropriate query builder or either of literal_combine or literal_implode.
+For any use-case where dynamic strings are required, it would be better to build those strings with an appropriate query builder or either of literal_concat or literal_implode.
 
 ## F.A.Q
 
+### Why string concatenation operator doesn't carry through the literal flag
 
-### Why no support for string concatenation operator
+tl:dr it would lead to bugs happening in production, that would be annoying to fix.
 
-Imagine we have a function that checks for safety:
+Consider this code:
 
-```
-function foo(array $params)
-{
-    foreach ($params as $param) {
-        // TODO - rename SearchBuilder
-        if (is_literal($param) !== true && !($param instanceof SearchBuilder)) {
-            throw new \Exception("this is not safe."); 
-        }
-    }
-    ...
+```php
+class Search {
+    const LIMIT_DEFAULT = '10';
 }
 
+function getLimitTerm(string $foo, string $bar)
+{
+    return $foo . '=' . $bar;
+}
+
+$value = getLimitTerm('limit', Search::LIMIT_DEFAULT);
 ```
 
-And then we have some code that does stuff:
-```
-$sortOrder = 'ASC';
+This code is correct, and `$value` is clearly composed of literal strings.
 
-// 20 lines of code, or multiple function calls
+But then another programmer comes along and changes the last line to be:
 
-$params[] = 'order=' . $sortOrder;
- 
-// 500 lines of code, or multiple function calls
-
-foo($params[]);
+```php
+$value = getLimitTerm('limit', $_GET['limit']);
 ```
 
-This code works, but then a few months later someone in the team changes it to be:
+It is obvious that `$value` is now not composed of literal strings.
 
+What's not obvious is whether this represents a mistake or not.
+
+It's not possible to look at this code and reason about whether that change is correct or not. You would need to look through the rest of the code, and see where `$value` is used to determine if it is going to be a problem.
+
+Hypothetically this type of error _should_ be caught in testing, before it occurs in production. However there are scenarios where it is inevitably going to happen: 
+
+* people who don't have any tests.
+* people who have tests (including coverage of this function) but don't have an integration test where the result of getLimitTerm is passed through to where the is_literal check is done.
+
+What's going to happen is that eventually when the is_literal check is done on that value, an error will occur. However that error will be annoyingly hard to debug, as there will be no information available as to where root cause of the problem occured.
+
+Someone will need to sit down, step through all the code by eye, to figure out where the value that is supposed to be a literal came from, and then figure out what to do about it. They would likely be under a lot of pressure to fix it as quickly as possible, as it would be affecting a system in production.
+
+#### Preventing this type of error 
+
+By not carrying the literal flag through string concatenation, and instead requiring people to use `literal_concat` this type of bug is much less likely to reach production:
+
+```php
+
+class Search {
+    const LIMIT_DEFAULT = '10';
+}
+
+function getLimitTerm(string $foo, string $bar)
+{
+    return literal_concat($foo, '=', $bar);
+}
+
+$value = getLimitTerm('limit', $_GET['limit']);
 ```
-$sortOrder = $_GET['order'];
 
-// 20 lines of code, or multiple function calls
+This code is clearly wrong, and will give an error when run. The error message in the exception will include in the callstack:
 
-$params[] = 'order=' . $sortOrder;
- 
-// 500 lines of code, or multiple function calls
+* the line where the error occured.
+* the line where user data was passed in.
 
-foo($params[]);
+This is a much easier bug to solve than the previous case.
 
+
+btw it might be tempting to suggest that a is_literal check could be done after the concatenation:
+```php
+function getLimitTerm(string $foo, string $bar)
+{
+    $value = $foo . '=' . $bar;
+    if (is_literal($value) !== true) {
+        throw new ProgrammerErrorException("User input isn't allowed here.");
+    }
+    return $value;
+}
 ```
 
-That code would correctly fail, but it would be a nightmare trying to track back where the error lies in the program.
+However this relies on people remembering to do the right thing. And any system that relies on programmers remembering to not forget (or to not take the time to do) something is going to fail.
 
-Although forcing developers to use specific functions to explicitly preserve the literal flag has a small overhead, it makes it easier to maintain large applications.
+Note, the implementation used in Java at Google refuses to concatenate literal strings with non-literal strings as a compile time check using a [@CompileTimeConstant annotation](https://youtu.be/ccfEu-Jj0as?t=500). As PHP doesn't have a static compile step (where all of the code for an app is compiled in one go), this isn't a great fit for PHP.  
 
-```
-$sortOrder = $_GET['order'];
+If we ever did add support for that type of annotation, whether to support carrying the is_literal flag through could be revisited. 
 
-// 20 lines of code, or multiple function calls
-
-$params[] = literal_combine('order=', $sortOrder);
-// ERROR occurs here, closer to where $sortOrder is coming from.
-```
 
 ### Why the name 'is_literal' ?
 
@@ -290,7 +316,7 @@ For bools, `TRUE` and `true` when cast to string give "1". For `FALSE` and `fals
 
 ## Backward Incompatible Changes 
 
-No known BC breaks, except for code-bases that already contain userland functions is_literal(), literal_implode() or literal_combine().
+No known BC breaks, except for code-bases that already contain userland functions is_literal(), literal_implode() or literal_concat().
 
 ## Proposed PHP Version(s) 
 
